@@ -1,90 +1,149 @@
 import sys
-from PyQt5.QtWidgets import (QWidget, QPushButton, QLineEdit,
-    QInputDialog, QApplication, QLabel)
 import requests
 import xml.etree.ElementTree as ET
-import datetime
+from PyQt5.QtWidgets import (QWidget, QLabel, QApplication, QComboBox, QPushButton)
+from PyQt5.QtGui import QPixmap, QFont
+ 
+class CBR_API(QWidget):
+    
+    def days(self):
 
-#today_date = datetime.datetime.today().strftime("%d/%m/%Y")
+        self.days_combo = QComboBox(self)
+        day_label = QLabel("Day", self)
+        day_label.move(20, 170)
+        for day in range(1, 31):
+            self.days_combo.addItem('%d' % day)
+        self.days_combo.move(20, 200)
+    
+    def month(self):
 
+        self.month_combo = QComboBox(self)
 
-def get_date_from_xml(tree):
-    return tree.attrib['Date']
+        month_label = QLabel("Month", self)
+        month_label.move(80, 170)
+ 
+        for month_num in range(1, 13):
+            self.month_combo.addItem('%d' % month_num)
+ 
+        self.month_combo.move(80, 200)
+        
+    def year(self):
 
+        self.year_combo = QComboBox(self)
 
+        month_label = QLabel("Year", self)
+        month_label.move(140, 170)
+ 
+        for year_num in range(1998, 2020):
 
-class Example(QWidget):
+            self.year_combo.addItem('%d' % year_num)
+ 
+        self.year_combo.move(140, 200)
+        
+    def load_result_image(self):
 
+        font = QFont()
+        font.setFamily("Arial")
+        font.setPointSize(18)
+     
+        dollar_label = QLabel(self)
+        dollar_label.setPixmap(QPixmap("dollar.png"))
+        dollar_label.move(60, 260)
+     
+        self.dollar_value = QLabel("0 rub", self)
+        self.dollar_value.setFont(font)
+        self.dollar_value.move(130, 263)
+     
+        euro_label = QLabel(self)
+        euro_label.setPixmap(QPixmap("euro.png"))
+        euro_label.move(50, 320)
+     
+        self.euro_value = QLabel("0 rub", self)
+        self.euro_value.setFont(font)
+        self.euro_value.move(130, 320)
+ 
     def __init__(self):
         super().__init__()
-        self.today_date = datetime.datetime.today().strftime("%d/%m/%Y")
-        self.rate = 0
-        self.url = "http://www.cbr.ru/scripts/XML_daily.asp?date_req="
         self.initUI()
-        
-    def showDialog(self, today_date):
-
-        text, ok = QInputDialog.getText(self, 'Input Dialog',
-            'Enter your name:')
-
-        if ok:
-            print(self.today_date)
-            self.today_date = text
-            print(text)
-            self.request(text)
-            
-    def request(self, data):
-        url = self.url + str(data)
-        print(url)
-        response = self.get_response(url)
-        response = self.check_the_answer(response)
-        tree = self.get_xml(response)
-        value = self.get_attrib_by_xml(tree)
-        print(value)
-        self.le.setText(value)
-        
-    def get_response(self, url):
-        response = requests.get(url)
-        return response
-
-    def check_the_answer(self, response):
-        if response.status_code == 200:
-            return response
-
-    def get_xml(self, response):
-        tree = ET.fromstring(response.content)
-        return tree
-    
-    def get_attrib_by_xml(self, tree):
-        for value in tree.findall('Valute'):
-            charcode = value.find('CharCode').text
-            rate = value.find('Value').text
-            if charcode == 'USD':
-                return rate   
-            
+ 
     def initUI(self):
         
-        self.btn = QPushButton('Dialog', self)
-        self.btn.move(20, 20)
-        self.btn.clicked.connect(self.showDialog)
+        logo_label = QLabel(self)
+        logo_label.setPixmap(QPixmap("logo.png"))
+        logo_label.move(0, 0)
         
-        self.le = QLineEdit(self)
-        self.le.move(130, 22)
+        self.days()
+        self.month()
+        self.year()
         
-        self.setGeometry(300, 300, 290, 150)
-        self.setWindowTitle('Input dialog')
-        #self.show()
-
-        lbl1 = QLabel("Dollars's rate: " + str(self.rate), self)
-        lbl1.move(15, 10)
-
-        self.setGeometry(300, 300, 250, 150)
-        self.setWindowTitle('Absolute')
+        ok_button = QPushButton('OK', self)
+        ok_button.resize(50, 25)
+        ok_button.move(220, 200)
+        
+        ok_button.clicked.connect(self.makeRequest)
+        
+        self.load_result_image()
+        
+        self.setFixedSize(300, 400)
+        self.setWindowTitle('valute rate')
         self.show()
+        
+    def getResult(self, day, month, year):
 
+        result = {
+            'usd': 0,
+            'eur': 0,
+        }
+     
+        if int(day) < 10:
+            day = '0%s' % day
+     
+        if int(month) < 10:
+            month = '0%s' % month
+     
+        try:
+
+            get_xml = requests.get(
+                'http://www.cbr.ru/scripts/XML_daily.asp?date_req=%s/%s/%s' % (day, month, year)
+            )
+     
+            structure = ET.fromstring(get_xml.content)
+        except:
+            return result
+     
+        try:
+            dollar = structure.find("./*[@ID='R01235']/Value")
+            result['dollar'] = dollar.text.replace(',', '.')
+        except:
+            result['dollar'] = 'x'
+     
+        try:
+            euro = structure.find("./*[@ID='R01239']/Value")
+            result['euro'] = euro.text.replace(',', '.')
+        except:
+            result['euro'] = 'x'
+     
+        return result
+    
+    def makeRequest(self):
+
+        day_value = self.days_combo.currentText()
+        month_value = self.month_combo.currentText()
+        year_value = self.year_combo.currentText()
+     
+
+        result = self.getResult(day_value, month_value, year_value)
+     
+
+        self.dollar_value.setText('%s rub' % result['dollar'])
+        self.dollar_value.adjustSize()
+     
+
+        self.euro_value.setText('%s rub' % result['euro'])
+        self.euro_value.adjustSize()
+ 
+ 
 if __name__ == '__main__':
-    
     app = QApplication(sys.argv)
-    ex = Example()
-    
+    money = CBR_API()
     sys.exit(app.exec_())
